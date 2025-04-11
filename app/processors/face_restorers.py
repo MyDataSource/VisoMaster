@@ -19,10 +19,10 @@ class FaceRestorers:
         t1024 = v2.Resize((1024, 1024), antialias=False)
         t2048 = v2.Resize((2048, 2048), antialias=False)
 
-        # If using a separate detection mode
+        # 如果使用单独的检测模式
         if restorer_det_type == 'Blend' or restorer_det_type == 'Reference':
             if restorer_det_type == 'Blend':
-                # Set up Transformation
+                # 设置变换
                 dst = self.models_processor.arcface_dst * 4.0
                 dst[:,0] += 32.0
 
@@ -30,10 +30,10 @@ class FaceRestorers:
                 try:
                     dst, _, _ = self.models_processor.run_detect_landmark(swapped_face_upscaled, bbox=np.array([0, 0, 512, 512]), det_kpss=[], detect_mode='5', score=detect_score/100.0, from_points=False)
                 except Exception as e: # pylint: disable=broad-except
-                    print(f"exception: {e}")
+                    print(f"检测异常: {e}")
                     return swapped_face_upscaled
 
-            # Return non-enhanced face if keypoints are empty
+            # 如果关键点为空，返回未增强的人脸
             if not isinstance(dst, np.ndarray) or len(dst)==0:
                 return swapped_face_upscaled
             
@@ -42,7 +42,7 @@ class FaceRestorers:
                 tform.estimate(dst, self.models_processor.FFHQ_kps)
             except:
                 return swapped_face_upscaled
-            # Transform, scale, and normalize
+            # 变换、缩放和归一化
             temp = v2.functional.affine(swapped_face_upscaled, tform.rotation*57.2958, (tform.translation[0], tform.translation[1]) , tform.scale, 0, center = (0,0) )
             temp = v2.functional.crop(temp, 0,0, 512, 512)
 
@@ -54,7 +54,7 @@ class FaceRestorers:
 
         temp = torch.unsqueeze(temp, 0).contiguous()
 
-        # Bindings
+        # 绑定
         outpred = torch.empty((1,3,512,512), dtype=torch.float32, device=self.models_processor.device).contiguous()
 
         if restorer_type == 'GFPGAN-v1.4':
@@ -86,7 +86,7 @@ class FaceRestorers:
         elif restorer_type == 'VQFR-v2':
             self.run_VQFR_v2(temp, outpred, fidelity_weight)
 
-        # Format back to cxHxW @ 255
+        # 格式化回 cxHxW @ 255
         outpred = torch.squeeze(outpred)
         outpred = torch.clamp(outpred, -1, 1)
         outpred = torch.add(outpred, 1)
@@ -96,11 +96,11 @@ class FaceRestorers:
         if restorer_type == 'GPEN-256' or restorer_type == 'GPEN-1024' or restorer_type == 'GPEN-2048':
             outpred = t512(outpred)
 
-        # Invert Transform
+        # 反转变换
         if restorer_det_type == 'Blend' or restorer_det_type == 'Reference':
             outpred = v2.functional.affine(outpred, tform.inverse.rotation*57.2958, (tform.inverse.translation[0], tform.inverse.translation[1]), tform.inverse.scale, 0, interpolation=v2.InterpolationMode.BILINEAR, center = (0,0) )
 
-        # Blend
+        # 混合
         alpha = float(restorer_blend)/100.0
         outpred = torch.add(torch.mul(outpred, alpha), torch.mul(swapped_face_upscaled, 1-alpha))
 
