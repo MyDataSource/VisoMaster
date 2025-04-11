@@ -458,3 +458,9 @@ class FaceMasks:
         diff = diff.permute(2,0,1)
 
         return diff
+
+    def sync(self):
+        if self.models_processor.device == 'cuda':
+            torch.cuda.synchronize()
+        elif self.models_processor.device == 'mps':
+            torch.mps.synchronize()

@@ -44,14 +44,23 @@ class ModelsProcessor(QtCore.QObject):
     processing_complete = QtCore.Signal()
     model_loaded = QtCore.Signal()  # Signal emitted with Onnx InferenceSession
 
-    def __init__(self, main_window: 'MainWindow', device='cuda'):
+    def __init__(self, main_window: 'MainWindow', device=None):
         super().__init__()
         self.main_window = main_window
-        self.provider_name = 'TensorRT'
+        
+        # 设置设备
+        if device is None:
+            if torch.backends.mps.is_available():
+                device = 'mps'
+            elif torch.cuda.is_available():
+                device = 'cuda'
+            else:
+                device = 'cpu'
         self.device = device
+        
+        self.provider_name = 'TensorRT'
         self.model_lock = threading.RLock()  # Reentrant lock for model access
         self.trt_ep_options = {
-            # 'trt_max_workspace_size': 3 << 30,  # Dimensione massima dello spazio di lavoro in bytes
             'trt_engine_cache_enable': True,
             'trt_engine_cache_path': "tensorrt-engines",
             'trt_timing_cache_enable': True,
@@ -61,10 +70,16 @@ class ModelsProcessor(QtCore.QObject):
             'trt_layer_norm_fp32_fallback': True,
             'trt_builder_optimization_level': 5,
         }
-        self.providers = [
-            ('CUDAExecutionProvider'),
-            ('CPUExecutionProvider')
-        ]       
+        
+        # 设置 providers
+        if device == 'mps':
+            self.providers = ['CPUExecutionProvider']
+        else:
+            self.providers = [
+                ('CUDAExecutionProvider'),
+                ('CPUExecutionProvider')
+            ]
+        
         self.nThreads = 2
         self.syncvec = torch.empty((1, 1), dtype=torch.float32, device=self.device)
 

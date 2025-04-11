@@ -8,11 +8,20 @@ onnxruntime.set_default_logger_severity(4)
 onnxruntime.log_verbosity_level = -1
 
 class DFMModel:
-    def __init__(self, model_path: str, providers, device='cuda'):
-
+    def __init__(self, model_path: str, providers, device=None):
         self._model_path = model_path
         self.providers = providers
+        
+        # 设置设备
+        if device is None:
+            if torch.backends.mps.is_available():
+                device = 'mps'
+            elif torch.cuda.is_available():
+                device = 'cuda'
+            else:
+                device = 'cpu'
         self.device = device
+        
         self.syncvec = torch.empty((1, 1), dtype=torch.float32, device=device)
         
         sess = self._sess = onnxruntime.InferenceSession(str(model_path), providers=self.providers)
@@ -32,13 +41,12 @@ class DFMModel:
         elif len(inputs) > 2:
             raise ValueError(f'Invalid model {model_path}')
 
-        # Mapping function from ONNX Runtime data types to PyTorch dtypes (you may need to adjust based on your actual usage)
+        # Mapping function from ONNX Runtime data types to PyTorch dtypes
         self.onnx_to_torch_dtype = {
             'tensor(float)': torch.float32,
             'tensor(double)': torch.float64,
             'tensor(int32)': torch.int32,
             'tensor(int64)': torch.int64,
-            # Add other necessary dtype mappings as needed
         }
 
         # Mapping function from ONNX Runtime data types to NumPy dtypes for binding
@@ -47,7 +55,6 @@ class DFMModel:
             'tensor(double)': np.float64,
             'tensor(int32)': np.int32,
             'tensor(int64)': np.int64,
-            # Add other necessary dtype mappings as needed
         }
 
     def get_model_path(self):
